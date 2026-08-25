@@ -31,8 +31,8 @@ spec:
           - --config-file=/etc/wva/config.yaml
           - --metrics-bind-address=:8443
           - --metrics-secure=true
-        image: controller:latest
-        imagePullPolicy: IfNotPresent
+        image: gcr.io/jacobmurry-gke-dev/wva:dev-asyncqueue
+        imagePullPolicy: Always
         env:
           - name: LOG_LEVEL
             value: "info"

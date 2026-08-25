@@ -34,6 +34,9 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
+
 	accel "github.com/llm-d/llm-d-workload-variant-autoscaler/internal/accelerator"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/actuator"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/collector/source"
@@ -71,6 +74,12 @@ type Engine struct {
 	Mapper         meta.RESTMapper
 	maxConcurrency int
 	config         *config.Config // Unified configuration (injected from main.go)
+	promAPI        promv1.API
+}
+
+// SetPrometheusAPI sets the Prometheus API client for scale-from-zero backlog queries.
+func (e *Engine) SetPrometheusAPI(api promv1.API) {
+	e.promAPI = api
 }
 
 // NewEngine creates a new instance of the scale-from-zero engine.
@@ -297,10 +306,30 @@ func (e *Engine) processInactiveVariant(ctx context.Context, scaleTargets map[st
 		if metricName == targetEPPMetricName && value.Value > 0 {
 			if value.Labels[targetEPPMetricLabel] == va.Spec.ModelID {
 				logger.Info(
-					"Target workload has pending requests, scaling up from zero", "metricName", metricName,
+					"Target workload has pending requests in EPP flow control, scaling up from zero", "metricName", metricName,
 					"metric", value.Labels, "value", value.Value)
 				pendingRequestExist = true
 				break
+			}
+		}
+	}
+
+	// Also check Prometheus for async queue backlog / flow control metrics
+	if !pendingRequestExist && e.promAPI != nil {
+		ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		query := fmt.Sprintf(`sum(inference_extension_flow_control_queue_size{target_model_name=%q}) or sum(inference_extension_flow_control_queue_size{model_name=%q,target_model_name=""}) or sum(llm_d_async_async_broker_backlog) or sum(llm_d_async_async_queue_depth)`, va.Spec.ModelID, va.Spec.ModelID)
+		val, _, err := e.promAPI.Query(ctxTimeout, query, time.Now())
+		if err == nil && val != nil {
+			if vec, ok := val.(model.Vector); ok && len(vec) > 0 {
+				for _, sample := range vec {
+					if sample.Value > 0 {
+						logger.Info("Target workload has pending requests in Prometheus query, scaling up from zero",
+							"query", query, "value", sample.Value)
+						pendingRequestExist = true
+						break
+					}
+				}
 			}
 		}
 	}

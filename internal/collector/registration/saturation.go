@@ -115,14 +115,15 @@ func RegisterSaturationQueries(sourceRegistry *source.SourceRegistry) {
 	// different namespaces, these queries will aggregate across all of them.
 	// Once the upstream adds a namespace label, these queries should filter by it.
 
-	// Number of requests queued in the scheduler's flow control layer
+	// Number of requests queued in the scheduler's flow control layer or async queue
 	registry.MustRegister(source.QueryTemplate{
 		Name: QuerySchedulerQueueSize,
 		Type: source.QueryTypePromQL,
 		Template: `sum(inference_extension_flow_control_queue_size{target_model_name="{{.modelID}}"})` +
-			` or sum(inference_extension_flow_control_queue_size{model_name="{{.modelID}}",target_model_name=""})`,
+			` or sum(inference_extension_flow_control_queue_size{model_name="{{.modelID}}",target_model_name=""})` +
+			` or sum(llm_d_async_async_broker_backlog) or sum(llm_d_async_async_queue_depth)`,
 		Params:      []string{source.ParamModelID},
-		Description: "Total requests queued in scheduler flow control for this model",
+		Description: "Total requests queued in scheduler flow control or async queue for this model",
 	})
 
 	// Total bytes of request bodies queued in the scheduler's flow control layer

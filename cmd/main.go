@@ -59,6 +59,7 @@ import (
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/coordinator"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/coordinator/plugins/gpurebalance"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/datastore"
+	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/engines/analyzers/asyncqueue"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/engines/analyzers/throughput"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/engines/pipeline"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/engines/saturation"
@@ -533,11 +534,11 @@ func main() {
 				return err
 			}
 			setupLog.Info("ThroughputAnalyzer registered (enabled in saturation config)")
-		} else {
-			setupLog.Info("ThroughputAnalyzer NOT registered — no saturation config entry " +
-				"enables 'throughput'. Add it to the analyzers config and restart the " +
-				"controller to enable it.")
 		}
+		if err := engine.RegisterAnalyzer(asyncqueue.AnalyzerName, asyncqueue.NewAsyncQueueAnalyzer()); err != nil {
+			return err
+		}
+		setupLog.Info("AsyncQueueAnalyzer registered")
 		go engine.StartOptimizeLoop(ctx)
 		return nil
 	}))
@@ -553,6 +554,7 @@ func main() {
 		if err != nil {
 			return err
 		}
+		engine.SetPrometheusAPI(promAPI)
 		go engine.StartOptimizeLoop(ctx)
 		return nil
 	}))

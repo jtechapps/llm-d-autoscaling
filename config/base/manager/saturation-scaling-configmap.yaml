@@ -52,17 +52,20 @@ data:
     # that namespace's quota budget. Has no effect without a same-scope GPU budget
     # (requires enableLimiter and a matching cluster/namespace budget).
     enableRescale: false
-  #
-  # ---------------------------------------------------------------------------
-  # ScalingPolicy schema (Phase 1) — additional fields, shown here as examples.
-  # Uncomment and adapt. An override entry's DATA KEY must be "{modelID}#{namespace}"
-  # (the engine looks up overrides by that key); the inner model_id/namespace are
-  # informational only.
-  # ---------------------------------------------------------------------------
-  #
-  # Per-model override using the plugin envelope + inline scale-to-zero:
-  #
-  # "granite-premium#production": |
+  "Qwen/Qwen3-8B#llm-d-demo": |
+    model_id: "Qwen/Qwen3-8B"
+    namespace: "llm-d-demo"
+    analyzers:
+      - type: async_queue
+        parameters:
+          queueName: "llm-d-async:requests:vllm-pool"
+          poolName: "vllm-pool"
+          highQueueThreshold: 50
+          minQueueThreshold: 1
+          minScaleDownAge: "1h"
+          targetDrainTime: "5m"
+          defaultPerReplicaRPS: 12.0
+
   #   model_id: granite-premium
   #   namespace: production
   #   priority: 2.0

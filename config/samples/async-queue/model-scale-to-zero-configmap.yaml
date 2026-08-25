@@ -1,0 +1,30 @@
+# Sample ConfigMap for Scale-To-Zero configuration in Workload Variant AutoScaler (WVA)
+#
+# This ConfigMap controls the idle retention duration and scale-to-zero policies
+# for asynchronous models when traffic or queue backlogs drop to 0.
+#
+# Schema:
+# - 'default': Global default thresholds applied to all models.
+# - '{modelID}' or '{modelID}#{namespace}': Per-model override configuration.
+#
+# Fields:
+# - enable_scale_to_zero (bool): Enables scaling model replicas down to 0 when idle.
+# - retention_period (duration): Time to wait after the last request finishes before scaling to zero (e.g. "1m", "5m", "10m").
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wva-model-scale-to-zero-config
+  namespace: llm-d-demo
+  labels:
+    app.kubernetes.io/name: workload-variant-autoscaler
+data:
+  # Global default: 1-minute retention window for batch workloads
+  default: |
+    enable_scale_to_zero: true
+    retention_period: "1m"
+
+  # Example per-model override with longer retention for expensive cold-start models
+  # "Qwen/Qwen3-8B": |
+  #   enable_scale_to_zero: true
+  #   retention_period: "5m"

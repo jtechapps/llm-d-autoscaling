@@ -1,0 +1,94 @@
+# Sample ConfigMap for Async Queue Autoscaling in Workload Variant AutoScaler (WVA)
+#
+# This ConfigMap defines saturation and analyzer configuration for asynchronous
+# and batch inference workloads managed by llm-d-async and batch-gateway.
+#
+# Schema:
+# - 'default': Global baseline configuration applied to all models unless overridden.
+# - '{modelID}#{namespace}': Per-model override for specific model and namespace.
+#
+# Analyzer Parameters for 'async_queue':
+# - mode (string):
+#     - "binary" (default): Scales up to 1 replica when backlog > 0, and down to 0 when backlog == 0.
+#     - "drain_time": Computes dynamic replica demand based on target SLA drain time:
+#                     Demand = Backlog / TargetDrainTime.
+# - queueName (string): Exact queue name to match (e.g., "llm-d-async:requests:vllm-pool").
+#                       Leave empty ("") to aggregate across ALL queues.
+# - poolName (string): Exact worker pool name to match (e.g., "vllm-pool").
+#                      Leave empty ("") to aggregate across ALL pools.
+# - queueID (string): Optional queue ID to match. Leave empty ("") for wildcard.
+# - metricName (string): Prometheus metric name for broker backlog.
+#                        Defaults to "llm_d_async_async_broker_backlog".
+# - highQueueThreshold (int64): Backlog depth triggering immediate scale-up from zero,
+#                                bypassing the minScaleDownAge cooldown window. Default: 50.
+# - minQueueThreshold (int64): Minimum backlog depth required to scale up after minScaleDownAge has elapsed. Default: 1.
+# - minScaleDownAge (duration): Cooldown window following scale-down to 0 before small backlogs trigger scale-up. Default: 1h.
+# - targetDrainTime (duration): Target time to drain the entire backlog in "drain_time" mode. Default: 5m.
+# - defaultPerReplicaRPS (float64): Baseline throughput per replica in requests per second. Default: 12.0.
+# - maxReplicas (int): Maximum replica ceiling for the async queue analyzer (0 = uncapped).
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wva-saturation-scaling-config
+  namespace: llm-d-demo
+  labels:
+    app.kubernetes.io/name: workload-variant-autoscaler
+data:
+  # Global default configuration
+  default: |
+    analyzers:
+      - type: async_queue
+        score: 1.0
+        parameters:
+          mode: "binary"
+          queueName: ""                     # Aggregates across all queues
+          poolName: ""                      # Aggregates across all worker pools
+          highQueueThreshold: 50
+          minQueueThreshold: 1
+          minScaleDownAge: "1h"
+          targetDrainTime: "5m"
+          defaultPerReplicaRPS: 12.0
+    scaleUpThreshold: 0.85
+    scaleDownBoundary: 0.70
+    enableLimiter: false
+
+  # Example 1: Per-model override for Qwen3-8B in binary (0/1) scale mode
+  "Qwen/Qwen3-8B#llm-d-demo": |
+    model_id: "Qwen/Qwen3-8B"
+    namespace: "llm-d-demo"
+    analyzers:
+      - type: async_queue
+        score: 1.0
+        parameters:
+          mode: "binary"
+          queueName: "llm-d-async:requests:vllm-pool"
+          poolName: "vllm-pool"
+          highQueueThreshold: 50
+          minQueueThreshold: 1
+          minScaleDownAge: "1h"
+          defaultPerReplicaRPS: 12.0
+    scaleUpThreshold: 0.85
+    scaleDownBoundary: 0.70
+    enableLimiter: false
+
+  # Example 2: Per-model override for high-volume batch processing using dynamic SLA drain time
+  # "meta-llama/Llama-3.1-8B-Instruct#production": |
+  #   model_id: "meta-llama/Llama-3.1-8B-Instruct"
+  #   namespace: "production"
+  #   analyzers:
+  #     - type: async_queue
+  #       score: 1.0
+  #       parameters:
+  #         mode: "drain_time"
+  #         queueName: "llm-d-async:requests:llama-pool"
+  #         poolName: "llama-pool"
+  #         targetDrainTime: "10m"
+  #         defaultPerReplicaRPS: 15.0
+  #         maxReplicas: 8
+  #         highQueueThreshold: 100
+  #         minQueueThreshold: 5
+  #         minScaleDownAge: "30m"
+  #   scaleUpThreshold: 0.85
+  #   scaleDownBoundary: 0.70
+  #   enableLimiter: false
