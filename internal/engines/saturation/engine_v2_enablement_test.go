@@ -55,7 +55,7 @@ func TestRunAnalyzersAndScore_DefaultConfigSaturationVotes(t *testing.T) {
 	ctx, logs := zapObserverCtx(t)
 	e := demandLivenessEngine(informativeSat(), throughputAnalyzer(1000))
 
-	results, err := e.runAnalyzersAndScore(ctx, "m", "ns", nil, noAnalyzerListCfg, nil, nil, nil, nil, 0)
+	results, err := e.runAnalyzersAndScore(ctx, "m", "ns", nil, noAnalyzerListCfg, nil, nil, nil, nil, 0, 0)
 	require.NoError(t, err)
 
 	byName := namedByName(results)
@@ -74,7 +74,7 @@ func TestRunAnalyzersAndScore_ThroughputOnlySilencesSaturationVote(t *testing.T)
 	ctx, logs := zapObserverCtx(t)
 	e := demandLivenessEngine(informativeSat(), throughputAnalyzer(1000))
 
-	results, err := e.runAnalyzersAndScore(ctx, "m", "ns", nil, enabledThroughputCfg, nil, nil, nil, nil, 0)
+	results, err := e.runAnalyzersAndScore(ctx, "m", "ns", nil, enabledThroughputCfg, nil, nil, nil, nil, 0, 0)
 	require.NoError(t, err)
 
 	byName := namedByName(results)
@@ -93,7 +93,7 @@ func TestRunAnalyzersAndScore_BothAnalyzersVote(t *testing.T) {
 	ctx, logs := zapObserverCtx(t)
 	e := demandLivenessEngine(informativeSat(), throughputAnalyzer(1000))
 
-	results, err := e.runAnalyzersAndScore(ctx, "m", "ns", nil, bothAnalyzersCfg, nil, nil, nil, nil, 0)
+	results, err := e.runAnalyzersAndScore(ctx, "m", "ns", nil, bothAnalyzersCfg, nil, nil, nil, nil, 0, 0)
 	require.NoError(t, err)
 
 	byName := namedByName(results)

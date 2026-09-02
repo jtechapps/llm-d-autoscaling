@@ -325,6 +325,7 @@ const (
 	QueryTypeRequestCount = "request_count"
 	QueryTypeCacheConfig  = "cache_config"
 	QueryTypeArrivalRate  = "arrival_rate"
+	QueryTypeAsyncBacklog = "async_backlog"
 )
 
 // Values for the LabelUnit Prometheus label, describing how to interpret the

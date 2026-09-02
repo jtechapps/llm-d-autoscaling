@@ -59,6 +59,7 @@ import (
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/coordinator"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/coordinator/plugins/gpurebalance"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/datastore"
+	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/engines/analyzers/asyncqueue"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/engines/analyzers/throughput"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/engines/pipeline"
 	"github.com/llm-d/llm-d-workload-variant-autoscaler/internal/engines/saturation"
@@ -417,6 +418,12 @@ func main() {
 	taRegistered := cfg.ThroughputAnalyzerEnabled()
 	configMapReconciler.ThroughputRegistered = taRegistered
 
+	// Frozen registration decision for the async_queue analyzer (Milestone 1),
+	// captured alongside the throughput decision. Like throughput, enabling
+	// async_queue after startup requires a controller restart because
+	// RegisterAnalyzer is frozen once StartOptimizeLoop runs.
+	aqRegistered := cfg.AsyncQueueAnalyzerEnabled()
+
 	// Use Prometheus configuration from unified Config (already validated during Load())
 	if cfg.PrometheusBaseURL() == "" {
 		setupLog.Error(nil, "no Prometheus configuration found - this should not happen after validation")
@@ -536,6 +543,17 @@ func main() {
 		} else {
 			setupLog.Info("ThroughputAnalyzer NOT registered — no saturation config entry " +
 				"enables 'throughput'. Add it to the analyzers config and restart the " +
+				"controller to enable it.")
+		}
+		if aqRegistered {
+			registration.RegisterAsyncQueueAnalyzerQueries(sourceRegistry, cfg.AsyncBacklogQuery())
+			if err := engine.RegisterAnalyzer(asyncqueue.AnalyzerName, asyncqueue.NewAsyncQueueAnalyzer()); err != nil {
+				return err
+			}
+			setupLog.Info("AsyncQueueAnalyzer registered (enabled in saturation config)")
+		} else {
+			setupLog.Info("AsyncQueueAnalyzer NOT registered — no saturation config entry " +
+				"enables 'async_queue'. Add it to the analyzers config and restart the " +
 				"controller to enable it.")
 		}
 		go engine.StartOptimizeLoop(ctx)

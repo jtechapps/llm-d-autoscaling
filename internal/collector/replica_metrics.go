@@ -1213,6 +1213,64 @@ func (c *ReplicaMetricsCollector) CollectModelArrivalRate(
 	return arrivalRate
 }
 
+// CollectAsyncBacklog collects the model-level async broker backlog (count of
+// pending async/batch requests) for a model from the llm-d-async broker metric.
+// Like CollectModelArrivalRate, it sums the backlog across the model with no
+// per-pod labels to reconcile. Returns 0 (not an error) when the query is not
+// registered (async_queue analyzer disabled) or the metric is unavailable.
+func (c *ReplicaMetricsCollector) CollectAsyncBacklog(
+	ctx context.Context,
+	modelID, namespace string,
+) float64 {
+	logger := ctrl.LoggerFrom(ctx)
+
+	params := map[string]string{
+		source.ParamNamespace: namespace,
+		source.ParamModelID:   modelID,
+	}
+
+	results, err := c.source.Refresh(ctx, source.RefreshSpec{
+		Queries: []string{registration.QueryAsyncBacklog},
+		Params:  params,
+	})
+	if err != nil {
+		// Categorize rather than swallow: a broken or misconfigured backlog query and
+		// a genuinely empty broker both surface here as a zero backlog, but only the
+		// former is a fault. Record the categorized reason so an operator can tell the
+		// two apart. Demand still falls back to 0 — zero backlog only ever permits
+		// scale-down, gated by the async analyzer's minScaleDownAge cooldown.
+		reason := prometheus.CategorizePrometheusError(err)
+		metrics.IncMetricsCollectionErrors(constants.QueryTypeAsyncBacklog, reason)
+		logger.V(logging.DEBUG).Info("Async backlog unavailable",
+			"modelID", modelID, "namespace", namespace, "reason", reason, "error", err)
+		return 0
+	}
+
+	result := results[registration.QueryAsyncBacklog]
+	if result == nil {
+		return 0
+	}
+	if result.HasError() {
+		reason := prometheus.CategorizePrometheusError(result.Error)
+		metrics.IncMetricsCollectionErrors(constants.QueryTypeAsyncBacklog, reason)
+		logger.V(logging.DEBUG).Info("Async backlog result carried an error",
+			"modelID", modelID, "namespace", namespace, "reason", reason)
+		return 0
+	}
+
+	var backlog float64
+	for _, value := range result.Values {
+		if !math.IsNaN(value.Value) && !math.IsInf(value.Value, 0) && value.Value >= 0 {
+			backlog += value.Value
+		}
+	}
+
+	logger.V(logging.DEBUG).Info("Collected async backlog",
+		"modelID", modelID, "namespace", namespace, "backlog", backlog)
+
+	return backlog
+}
+
 // getScaleTargetNames extracts scale target names from the scale target map.
 func getScaleTargetNames(scaleTargets map[string]scaletarget.ScaleTargetAccessor) []string {
 	names := make([]string, 0, len(scaleTargets))

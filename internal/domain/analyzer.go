@@ -52,6 +52,13 @@ type AnalyzerInput struct {
 	// traffic yet). Any analyzer with a demand model may convert this into its
 	// own unit (e.g. tokens/sec for the throughput analyzer).
 	ArrivalRate float64
+
+	// AsyncBacklog is the model-level count of async/batch requests waiting in the
+	// llm-d-async broker for this model, summed across the whole broker with no
+	// per-pod labels. It is the demand signal for the async_queue analyzer. Zero
+	// when the metric is unavailable (async broker absent, query unset, or no
+	// pending work). See docs/design/async-queue-autoscaling-roadmap.md.
+	AsyncBacklog float64
 }
 
 // SchedulerQueueMetrics holds model-level queue metrics from the llm-d

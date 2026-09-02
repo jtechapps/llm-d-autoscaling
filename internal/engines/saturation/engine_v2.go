@@ -107,6 +107,7 @@ func (e *Engine) runAnalyzersAndScore(
 	variantAutoscalings map[string]*llmdVariantAutoscalingV1alpha1.VariantAutoscaling,
 	schedulerQueue *domain.SchedulerQueueMetrics,
 	arrivalRate float64,
+	asyncBacklog float64,
 ) ([]pipeline.NamedAnalyzerResult, error) {
 	logger := ctrl.LoggerFrom(ctx)
 
@@ -137,6 +138,7 @@ func (e *Engine) runAnalyzersAndScore(
 		Config:         &config,
 		SchedulerQueue: schedulerQueue,
 		ArrivalRate:    arrivalRate,
+		AsyncBacklog:   asyncBacklog,
 	}
 
 	// Whether saturation votes in the combine (RC/SC) math this cycle. It always
@@ -630,9 +632,10 @@ func (e *Engine) collectV2ModelRequest(
 	variantAutoscalings map[string]*llmdVariantAutoscalingV1alpha1.VariantAutoscaling,
 	schedulerQueue *domain.SchedulerQueueMetrics,
 	arrivalRate float64,
+	asyncBacklog float64,
 ) (*pipeline.ModelScalingRequest, error) {
 	namedResults, err := e.runAnalyzersAndScore(ctx, modelID, namespace, replicaMetrics, config,
-		variantStates, scaleTargets, variantAutoscalings, schedulerQueue, arrivalRate)
+		variantStates, scaleTargets, variantAutoscalings, schedulerQueue, arrivalRate, asyncBacklog)
 	if err != nil {
 		return nil, fmt.Errorf("collecting V2 model request for %s/%s: %w", namespace, modelID, err)
 	}

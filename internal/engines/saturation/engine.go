@@ -1046,7 +1046,8 @@ func (e *Engine) optimizeV2(
 
 		req, err := e.collectV2ModelRequest(ctx, modelID, namespace,
 			data.replicaMetrics, saturationConfig, data.variantStates,
-			data.scaleTargets, data.variantAutoscalings, data.schedulerQueue, data.arrivalRate)
+			data.scaleTargets, data.variantAutoscalings, data.schedulerQueue, data.arrivalRate,
+			data.asyncBacklog)
 		if err != nil {
 			msg := "V2 analysis failed"
 			logger.Error(err, msg, "modelID", modelID)
@@ -1505,6 +1506,7 @@ type modelData struct {
 	variantStates       []domain.VariantReplicaState
 	schedulerQueue      *domain.SchedulerQueueMetrics
 	arrivalRate         float64
+	asyncBacklog        float64
 }
 
 // prepareModelData collects metrics and builds lookup maps for a model's VAs.
@@ -1580,6 +1582,7 @@ func (e *Engine) prepareModelData(
 	variantStates := e.BuildVariantStates(ctx, modelVAs, scaleTargets, k8sClient)
 	schedulerQueue := e.ReplicaMetricsCollector.CollectSchedulerQueueMetrics(ctx, modelID)
 	arrivalRate := e.ReplicaMetricsCollector.CollectModelArrivalRate(ctx, modelID, namespace)
+	asyncBacklog := e.ReplicaMetricsCollector.CollectAsyncBacklog(ctx, modelID, namespace)
 
 	return &modelData{
 		modelID:             modelID,
@@ -1591,6 +1594,7 @@ func (e *Engine) prepareModelData(
 		variantStates:       variantStates,
 		schedulerQueue:      schedulerQueue,
 		arrivalRate:         arrivalRate,
+		asyncBacklog:        asyncBacklog,
 	}, nil
 }
 

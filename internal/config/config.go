@@ -363,6 +363,54 @@ func (c *Config) ThroughputAnalyzerEnabled() bool {
 	return false
 }
 
+// asyncQueueAnalyzerName is the analyzer name used by the async_queue analyzer's
+// saturation-config entry. Duplicated as a literal (rather than importing
+// internal/engines/analyzers/asyncqueue.AnalyzerName) because internal/config is
+// a lower layer than the analyzers package.
+const asyncQueueAnalyzerName = "async_queue"
+
+// asyncBacklogQueryParam is the async_queue analyzer parameter that lets an
+// operator supply a custom PromQL template for the backlog signal (config-driven
+// query). When unset, the default query (registration.DefaultAsyncBacklogQuery)
+// is registered.
+const asyncBacklogQueryParam = "backlogQuery"
+
+// AsyncQueueAnalyzerEnabled reports whether any saturation config entry lists the
+// async_queue analyzer with Enabled nil-or-true. Startup-time gate, mirroring
+// ThroughputAnalyzerEnabled: when no entry enables async_queue anywhere, the
+// analyzer and its backlog query are never registered. Thread-safe.
+func (c *Config) AsyncQueueAnalyzerEnabled() bool {
+	for _, sc := range c.SaturationConfig() {
+		for _, aw := range sc.Analyzers {
+			if aw.EffectiveType() == asyncQueueAnalyzerName && (aw.Enabled == nil || *aw.Enabled) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// AsyncBacklogQuery returns the operator-supplied PromQL template for the async
+// backlog signal, taken from the first enabled async_queue analyzer entry's
+// `backlogQuery` parameter. Returns "" when no entry sets it, in which case the
+// caller (registration.RegisterAsyncQueueAnalyzerQueries) falls back to the
+// default query. Thread-safe.
+func (c *Config) AsyncBacklogQuery() string {
+	for _, sc := range c.SaturationConfig() {
+		for _, aw := range sc.Analyzers {
+			if aw.EffectiveType() != asyncQueueAnalyzerName || (aw.Enabled != nil && !*aw.Enabled) {
+				continue
+			}
+			if v, ok := aw.Parameters[asyncBacklogQueryParam]; ok {
+				if s, ok := v.(string); ok && s != "" {
+					return s
+				}
+			}
+		}
+	}
+	return ""
+}
+
 // ScaleFromZeroMaxConcurrency returns the scale-from-zero max concurrency.
 // Thread-safe.
 func (c *Config) ScaleFromZeroMaxConcurrency() int {
