@@ -1,8 +1,8 @@
 # Batch and asynchronous inference autoscaling driven by llm-d-async
 
-Status: Draft — Milestone 1 validated end-to-end on the ap-135-vllm prototype
-cluster (2026-09-21); M2/M3 blueprints authored, validation pending
-Author: @jacobmurry
+Status: Draft — Milestone 1 validated end-to-end in a GKE cluster
+(2026-09-21); M2/M3 blueprints authored, validation pending
+Author: @jtechapps
 
 ## Summary
 
@@ -432,8 +432,7 @@ spec:
 Replace the schedule with the work itself: scale up when broker backlog
 crosses a threshold, scale to zero when the queue drains.
 
-**ScaledObject** (see
-[`async-batch-autoscaling/m2-backlog-scaledobject.yaml`](async-batch-autoscaling/m2-backlog-scaledobject.yaml)):
+**ScaledObject** (the standalone manifest lands once M2 is validated):
 
 ```yaml
 apiVersion: keda.sh/v1alpha1
@@ -572,8 +571,7 @@ result as `llm_d_async_async_deadline_required_replicas` (per `pool_name`).
 The tuning constants `R`, `C`, `max_replicas`, and the optional safety factor
 are producer configuration (see the metrics contract). KEDA then scales on one
 plain trigger — `metricType: AverageValue`, `threshold: "1"` — the metric *is*
-desired replicas. See
-[`async-batch-autoscaling/m3-deadline-scaledobject.yaml`](async-batch-autoscaling/m3-deadline-scaledobject.yaml).
+desired replicas. The ScaledObject manifest lands once M3 is validated.
 
 This is the boundary refactor: the deadline math moves out of a Prometheus
 recording-rule chain and into the component that owns both the data and the
@@ -582,8 +580,7 @@ constants. It removes two footguns of the recording-rule approach — the
 between the rule and the ScaledObject — since both now live once, in producer
 config. A recording-rule implementation of the same formula remains documented
 as a **fallback** for clusters pinned to an llm-d-async build that predates the
-derived metric (see
-[`async-batch-autoscaling/m3-deadline-prometheusrule.yaml`](async-batch-autoscaling/m3-deadline-prometheusrule.yaml)).
+derived metric; it lands alongside the M3 ScaledObject.
 
 **Degradation design.** The M3 ScaledObject keeps the M2 backlog trigger as a
 second trigger. KEDA ORs trigger activity and the HPA takes the max of their
@@ -624,8 +621,8 @@ add a companion alert on `absent(llm_d_async_async_deadline_required_replicas)`.
 
 ## Prototype environment and validation
 
-Primary validation runs on a live dev cluster (GKE Autopilot,
-`ap-135-vllm`): llm-d-async v0.10.0 (Redis sorted-set transport, six queues
+Primary validation runs on a live GKE Autopilot dev cluster: llm-d-async
+v0.10.0 (Redis sorted-set transport, six queues
 across two worker pools), llm-d-router EPP + Envoy, single `Deployment/vllm`
 (Qwen3-8B, 1×L4) selected by InferencePool `llm-d-router`, kube-prometheus-
 stack already scraping all components, GPU capacity via a DWS

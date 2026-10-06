@@ -14,7 +14,6 @@ cluster.
 | --- | --- | --- |
 | `worker-pools-readiness-gate.json` | **Validated hold-back config**: fail-closed `prometheus-query` inner gate on `llm_d_epp_ready_endpoints`. Replaces `worker-pools.json` in the llm-d-async ConfigMap. | committed |
 | `m1-cron-scaledobject.yaml` | M1: cron-windowed 0↔N scaling (fixed N for the window). | committed |
-| `worker-pools-budget-gate.json` | `prometheus-budget` variant — preferred once llm-d-async's cascade queries match the EPP's exported metric names (v0.10.0 queries deprecated `inference_pool_*` names; recent EPPs export only `llm_d_epp_*`, leaving this gate closed even with backends ready — [llm-d-async#460](https://github.com/llm-d/llm-d-async/issues/460)). | after #460 |
 
 Apply exactly one ScaledObject per scale target at a time (M1 *or* M2 *or*
 M3) — multiple ScaledObjects fighting over one Deployment is undefined
